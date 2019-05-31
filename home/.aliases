@@ -1,0 +1,117 @@
+
+######################################################
+# Misc / Helpers
+######################################################
+
+# Helpers
+alias ll='ls -alFh --time-style="+%Y-%m-%d $newline %H:%M"'
+alias grep='GREP_COLOR="1;37;45" LANG=C grep --color=auto'
+alias df="df -h"
+alias ip="curl -s http://checkip.dyndns.com/ | sed 's/[^0-9\.]//g'"
+alias d="du -h -d=1"
+alias fin="find . -name "
+alias sublime="subl"
+alias aliasup="source ~/.profile"
+alias whatismyip="dig +short myip.opendns.com @resolver1.opendns.com"
+
+# Screen 
+alias sc="screen"
+alias sl="screen -ls"
+alias sr="screen -r"
+
+# Add an "alert" alias for long running commands.  Use like so:
+# sleep 10; alert
+alias alert='notify-send --urgency=low -i "$([ $? = 0 ] && echo terminal || echo error)" "$(history|tail -n1|sed -e '\''s/^\s*[0-9]\+\s*//;s/[;&|]\s*alert$//'\'')"'
+
+
+######################################################
+# DEVELOPMENT
+######################################################
+
+# Git branch bash completion
+# https://gist.github.com/JuggoPop/10706934
+if [ -f ~/dotfiles/bash_completion.d/git-completion.bash ]; then
+  source ~/dotfiles/bash_completion.d/git-completion.bash
+  
+  # Add git completion to aliases
+  __git_complete g __git_main
+  __git_complete gco _git_checkout
+  __git_complete gm _git_merge
+  __git_complete gpul _git_pull
+  __git_complete gpus _git_push
+fi
+
+#GIT Commands
+alias gpull="git pull origin"
+alias gpush="git push origin"
+alias gco="git checkout"
+alias ga="git add"
+alias gc="git commit -m"
+alias gs="git status"
+alias gb="git branch"
+alias gm="git merge"
+alias gpus="git push"
+alias gpul="git pull"
+alias pm="git push origin master"
+alias gpm="gp master"
+alias aa="git add -A ."
+alias gl="git log --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit"
+
+# enable color support of ls and also add handy aliases
+if [ -x /usr/bin/dircolors ]; then
+    test -r ~/.dircolors && eval "$(dircolors -b ~/.dircolors)" || eval "$(dircolors -b)"
+    alias ls='ls --color=auto -h'
+    alias grep='grep --color=auto'
+    alias fgrep='fgrep --color=auto'
+    alias egrep='egrep --color=auto'
+fi
+
+# Drupal
+alias c="clear"
+alias cc="drush cc all"
+alias cr="drush cr"
+
+######################################################-
+# Docker alias and function
+#
+# Sources:
+#  - https://www.kartar.net/2014/03/useful-docker-bash-functions-and-aliases/
+######################################################
+
+# Get latest container ID
+alias dl="docker ps -l -q"
+
+# Get container process
+alias dps="docker ps"
+
+# Get process included stop container
+alias dpa="docker ps -a"
+
+# Get images
+alias di="docker images"
+
+# Get IP from container name
+# Usage: dip {container name}
+alias dip="docker inspect --format '{{ .NetworkSettings.IPAddress }}'"
+
+# Remove all non running containers
+function drm() { docker rm $(docker ps -q -a); }
+
+# Remove all images 
+function dri() { docker rmi $(docker images -q); }
+
+# Run a conainer as deamonized
+alias dkd="docker run -d -P"
+
+# Run a conainer as interactive
+alias dki="docker run -t -i -P"
+
+# Build and tag drom current dir
+# Usage: dbt {user/repo-name}
+function dbt() { docker build -t="$1" .; }
+
+# Enter a container
+function dbash() { docker exec -it $(docker ps -aqf "name=$1") bash; }
+
+# Show all alias related docker
+dalias() { alias | grep 'docker' | sed "s/^\([^=]*\)=\(.*\)/\1 => \2/"| sed "s/['|\']//g" | sort; }

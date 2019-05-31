@@ -1,0 +1,22 @@
+
+# Add `~/bin` to the `$PATH`
+export PATH="$HOME/bin:$PATH"
+
+# Add `~/.gems/bin` to the `$PATH`
+export PATH="$HOME/.gems/bin:$PATH"
+
+# Include composer
+if [ -d "$HOME/.composer/vendor/bin" ] ; then
+  export PATH="$HOME/.composer/vendor/bin:$PATH"
+fi
+
+# RVM
+if [ -f ~/.rvm/scripts/rvm ]; then
+    export PATH="$PATH:$HOME/.rvm/bin" # Add RVM to PATH for scripting
+    source ~/.rvm/scripts/rvm
+fi
+
+# Custom scripts bin
+if [ -d "$HOME/scripts/bin" ] ; then
+  export PATH="$HOME/scripts/bin:$PATH"
+fi

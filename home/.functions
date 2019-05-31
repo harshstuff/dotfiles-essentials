@@ -1,0 +1,393 @@
+
+######################################################
+# CROSS PLATFORM
+######################################################
+
+
+# Apps
+######################################################
+
+# Simple calculator
+function calc() {
+	local result=""
+	result="$(printf "scale=10;$*\n" | bc --mathlib | tr -d '\\\n')"
+	#                       └─ default (when `--mathlib` is used) is 20
+	#
+	if [[ "$result" == *.* ]]; then
+		# improve the output for decimal numbers
+		printf "$result" |
+		sed -e 's/^\./0./'        `# add "0" for cases like ".5"` \
+		    -e 's/^-\./-0./'      `# add "0" for cases like "-.5"`\
+		    -e 's/0*$//;s/\.$//'   # remove trailing zeros
+	else
+		printf "$result"
+	fi
+	printf "\n"
+}
+
+# `subl` with no arguments opens the current directory in Sublime Text, otherwise
+# opens the given location
+function edit() {
+	if [ $# -eq 0 ]; then
+		subl .&
+	else
+		subl "$@"&
+	fi
+}
+
+# Open a group of files matching a grep in sublime.
+function edit_grep() {
+	 subl $(grep -lir "${1}" ${2})
+}
+
+# `tre` is a shorthand for `tree` with hidden files and color enabled, ignoring
+# the `.git` directory, listing directories first. The output gets piped into
+# `less` with options to preserve color and line numbers, unless the output is
+# small enough for one screen.
+function tre() {
+	tree -aC -I '.git|node_modules|bower_components' --dirsfirst "$@" | less -FRNX
+}
+
+
+# File system
+######################################################
+
+# Create a new directory and enter it
+function mkd() {
+	mkdir -p "$@" && cd "$@"
+}
+
+# Determine size of a file or total size of a directory
+function fs() {
+	if du -b /dev/null > /dev/null 2>&1; then
+		local arg=-sbh
+	else
+		local arg=-sh
+	fi
+	if [[ -n "$@" ]]; then
+		du $arg -- "$@"
+	else
+		du $arg .[^.]* *
+	fi
+}
+
+# Find files over 1GB
+function find_large_files() {
+	du -h ${1} | grep '[0-9\.]\+G'
+}
+function find_large_files_root() {
+	du -h --exclude=/shares/pool ${1} | grep '[0-9\.]\+G'
+}
+
+# Move a file type and leave symlink behind
+function mvln() {
+	local filetype="*.$1"
+	for f in $filetype
+	do
+		echo "moving $f to $2 and leaving symlink behind";
+		mv "$f" "$2$3$f"
+		ln -s "$2$3$f" "$f"
+	done
+}
+
+# Git
+######################################################
+
+# Use Git’s colored diff when available
+hash git &>/dev/null
+if [ $? -eq 0 ]; then
+	function diff() {
+		git diff --no-index --color-words "$@"
+	}
+fi
+
+# Services
+######################################################
+
+# Create a git.io short URL
+function gitio() {
+	if [ -z "${1}" -o -z "${2}" ]; then
+		echo "Usage: \`gitio slug url\`"
+		return 1
+	fi
+	curl -i http://git.io/ -F "url=${2}" -F "code=${1}"
+}
+
+
+# Servers and Development
+######################################################
+
+# Change to a site
+s() {
+	BASE="$HOME/sites"
+  if [ -d "$BASE/$1/docroot" ]; then
+    cd "$BASE/$1/docroot"
+  else
+    if [ -d "$BASE/$1/public" ]; then
+      cd "$BASE/$1/public"
+    else
+      if [ -d "$BASE/$1" ]; then
+        cd "$BASE/$1"
+      else
+        cd "$BASE"
+      fi
+    fi
+  fi
+}
+
+# View apache error logs
+apache-errors() {
+  less /var/log/apache2/error.log
+}
+
+# Start an HTTP server from a directory, optionally specifying the port
+function server() {
+	local port="${1:-8000}"
+	sleep 1 && open "http://localhost:${port}/" &
+	# Set the default Content-Type to `text/plain` instead of `application/octet-stream`
+	# And serve everything as UTF-8 (although not technically correct, this doesn’t break anything for binary files)
+	python -c $'import SimpleHTTPServer;\nmap = SimpleHTTPServer.SimpleHTTPRequestHandler.extensions_map;\nmap[""] = "text/plain";\nfor key, value in map.items():\n\tmap[key] = value + ";charset=UTF-8";\nSimpleHTTPServer.test();' "$port"
+}
+
+# Start a PHP server from a directory, optionally specifying the port
+# (Requires PHP 5.4.0+.)
+function phpserver() {
+	local port="${1:-4000}"
+	local ip=$(ipconfig getifaddr en1)
+	sleep 1 && open "http://${ip}:${port}/" &
+	php -S "${ip}:${port}"
+}
+
+
+# Domain Info
+######################################################
+
+# All the dig info
+function digga() {
+	dig +nocmd "$1" any +multiline +noall +answer
+}
+
+# Show all the names (CNs and SANs) listed in the SSL certificate
+# for a given domain
+function getcertnames() {
+	if [ -z "${1}" ]; then
+		echo "ERROR: No domain specified."
+		return 1
+	fi
+
+	local domain="${1}"
+	echo "Testing ${domain}…"
+	echo # newline
+
+	local tmp=$(echo -e "GET / HTTP/1.0\nEOT" \
+		| openssl s_client -connect "${domain}:443" 2>&1);
+
+	if [[ "${tmp}" = *"-----BEGIN CERTIFICATE-----"* ]]; then
+		local certText=$(echo "${tmp}" \
+			| openssl x509 -text -certopt "no_header, no_serial, no_version, \
+			no_signame, no_validity, no_issuer, no_pubkey, no_sigdump, no_aux");
+			echo "Common Name:"
+			echo # newline
+			echo "${certText}" | grep "Subject:" | sed -e "s/^.*CN=//";
+			echo # newline
+			echo "Subject Alternative Name(s):"
+			echo # newline
+			echo "${certText}" | grep -A 1 "Subject Alternative Name:" \
+				| sed -e "2s/DNS://g" -e "s/ //g" | tr "," "\n" | tail -n +2
+			return 0
+	else
+		echo "ERROR: Certificate not found.";
+		return 1
+	fi
+}
+
+# Download remote pach file and apply it
+function remote-patch() {
+        if [ -z "${1}" ]; then
+                echo "ERROR: No url provided."
+                return 1
+        fi
+        wget -O remotepatchfile.patch "${1}"
+        patch -p1 < remotepatchfile.patch
+	rm remotepatchfile.patch
+}
+
+# Check a url is responding.
+function check_url(){
+  curl "$1" -s -o /dev/null -w \
+  	"
+	response_code: %{http_code}\n
+  	dns_time: %{time_namelookup}
+  	connect_time: %{time_connect}
+  	pretransfer_time: %{time_pretransfer}
+  	starttransfer_time: %{time_starttransfer}
+  	total_time: %{time_total}
+  	"
+}
+
+
+# Drupal
+######################################################
+
+# Drupal download module and install
+dm(){
+    drush dl $1;
+    drush en -y $1;
+}
+
+dm8() {
+  if [ ! -f "./composer.json" ]; then
+    cd ..
+  fi
+  composer require drupal/"$1"
+  cd docroot 
+  drush en -y "$1"
+}
+
+cdm(){
+	  composer require drupal/$1;
+	  drush en -y $1;
+}
+
+# Drupal download module to default/modules/contrib and install
+dmc(){
+    drush dl $1 --destination=sites/default/modules/contrib;
+    drush en -y $1;
+}
+
+# Drupal download module to default/modules/devtools and install
+dmd(){
+    drush dl $1 --destination=sites/default/modules/devtools;
+    drush en -y $1;
+}
+
+# Drupal drush up - retains old htaccess and gitignore
+drushup (){
+  echo "============= updating drupal while retaining old htaccess, gitignore and robots.txt ================"
+  mv ./.htaccess ./.htaccessOLD; mv ./.gitignore ./.gitignoreOLD; mv ./robots.txt ./robots.txtOLD;
+  drush up $1;
+  rm ./.htaccess;  rm ./.gitignore;  rm ./robots.txt;
+  mv ./.htaccessOLD ./.htaccess; mv ./.gitignoreOLD ./.gitignore; mv ./robots.txtOLD ./robots.txt
+}
+
+# Drupal dev environment
+drupal_dev(){
+  drush en -y devel browsersync field_ui views_ui context_ui stage_file_proxy
+  drush vset 'cache' 0
+  drush vset 'block_cache' 0
+  drush vset 'preprocess_css' 0
+  drush vset 'preprocess_js' 0
+  drush cc all
+  drush uli
+}
+
+# Sync a D8 database and enable dev modules.
+function sync_d8() {
+  local site="$1"
+  local alias="@$2"
+  local env="$3"
+  local skip_modules="$4"
+  local site_dir=~/sites/"$site"
+  local backup_dir=~/sites/db_backups/"$2"
+  
+  echo "=== Running $1 DB sync (with backup), composer install & config import ===" | lolcat
+
+  # Dump the current DB
+  cd ${site_dir}/docroot
+  mkdir -p ${backup_dir}
+  drush ${alias}.local sql-dump -y --gzip --result-file=${backup_dir}/local_latest_dump_$(date +%Y%m%d\-%H%M).sql
+
+  # Delete the oldest of 5 files
+  cd ${backup_dir}
+  ls -t | sed -e '1,3d' | xargs -d '\n' rm
+
+  # Drop the current DB
+  cd ${site_dir}/docroot
+  drush ${alias}.local sql-drop -y
+
+  # Sync the local DB with UAT
+  drush sql-sync ${alias}.${env} ${alias}.local -y
+
+  # Run composer updates
+  cd ${site_dir}
+  composer install
+  bin/phing compass:compile
+
+  # Import Drupal config
+  cd ${site_dir}/docroot
+  # drush ${alias}.local cim -y
+
+  # Enable some dev modules only if param 4 is not set
+  if [ -z "$skip_modules" ]; then
+    drush ${alias}.local en -y devel kint config_devel stage_file_proxy browsersync
+  fi
+	
+  # Create login link
+  drush ${alias}.local uli admin | lolcat
+
+  echo "|||  ᕦ(ò_óˇ)ᕤ  |||" | lolcat
+}
+
+
+# Compression/Extracting
+######################################################
+
+# Extract all rars into the current folder
+unrar_folder () {
+    for f in *.rar;do unrar e $f -o-;done
+}
+
+# Unzip all zips from current folder to $1 destination (recursive)
+unzip_folder () {
+    find . -name "*.zip" | while read filename; do unzip -o -d "$1" "$filename"; done;
+}
+
+# Extract anything
+extract () {
+    if [ -f $1 ] ; then
+      case $1 in
+        *.tar.bz2)   tar xjf $1     ;;
+        *.tar.gz)    tar xzf $1     ;;
+        *.bz2)       bunzip2 $1     ;;
+        *.rar)       unrar e $1     ;;
+        *.gz)        gunzip $1      ;;
+        *.tar)       tar xf $1      ;;
+        *.tbz2)      tar xjf $1     ;;
+        *.tgz)       tar xzf $1     ;;
+        *.zip)       unzip $1       ;;
+        *.Z)         uncompress $1  ;;
+        *.7z)        7z x $1        ;;
+        *)     echo "'$1' cannot be extracted via extract()" ;;
+         esac
+     else
+         echo "'$1' is not a valid file"
+     fi
+}
+
+# Create a .tar.gz archive, using `zopfli`, `pigz` or `gzip` for compression
+function targz() {
+	local tmpFile="${@%/}.tar"
+	tar -cvf "${tmpFile}" --exclude=".DS_Store" "${@}" || return 1
+
+	size=$(
+		stat -f"%z" "${tmpFile}" 2> /dev/null; # OS X `stat`
+		stat -c"%s" "${tmpFile}" 2> /dev/null # GNU `stat`
+	)
+
+	local cmd=""
+	if (( size < 52428800 )) && hash zopfli 2> /dev/null; then
+		# the .tar file is smaller than 50 MB and Zopfli is available; use it
+		cmd="zopfli"
+	else
+		if hash pigz 2> /dev/null; then
+			cmd="pigz"
+		else
+			cmd="gzip"
+		fi
+	fi
+
+	echo "Compressing .tar using \`${cmd}\`…"
+	"${cmd}" -v "${tmpFile}" || return 1
+	[ -f "${tmpFile}" ] && rm "${tmpFile}"
+	echo "${tmpFile}.gz created successfully."
+}
