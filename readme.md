@@ -1,20 +1,19 @@
-# My dotfiles
+# Dotfile essentials
+
+## Fork this repo
+
+Click the fork button
 
 ## Installation
 
-### Dotfiles
-
 ```
-# Install homesick
-gem install homesick
+# Clone into home dir
+cd ~
+git clone *github.com:my-repo* dotfiles
 
-# Clone repository
-homesick clone git@bitbucket.org:jez500/dotfiles.git
-
-# Link dotfiles
-homesick symlink dotfiles
+# Symlink all your dotfiles
+cd dotfiles
+./init.sh
 ```
-Also see https://github.com/technicalpickles/homesick
 
-### Thanks
-Mostly copied from https://github.com/erfanimani/dotfiles
+Backups of existing dotfiles can be found in `~/dotfiles-backup`
